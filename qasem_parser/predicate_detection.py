@@ -19,6 +19,8 @@ class BertPredicateDetector(PredicateDetector):
     @classmethod
     def from_pretrained(cls, nominal_classifier_path: str,
                         spacy_model_or_name:Union[str, spacy.Language] = 'en_core_web_sm', **kwargs):
+
+        # TODO(plroit): forgot to move the model to the device and handle gpu related input/output
         if isinstance(spacy_model_or_name, str):
             nlp = spacy.load(spacy_model_or_name)
         else:
@@ -40,7 +42,7 @@ class BertPredicateDetector(PredicateDetector):
         self.batch_size = batch_size
         self.threshold = threshold
         # not sure why they store True as a string?
-        self.positive_label_idx = nom_model.config.label_to_id['True']
+        self.positive_label_idx = nom_model.config.label2id['True']
 
     @staticmethod
     def _is_verbal_predicate(tok: spacy.tokens.Token):
@@ -64,8 +66,7 @@ class BertPredicateDetector(PredicateDetector):
 
         inputs = self._prepare_inputs(batch)
         # forward call, let's get the logits
-        outputs = self.nom_model(inputs).detach().cpu()
-        logits = outputs.logits
+        logits = self.nom_model(**inputs).logits.detach().cpu()
         # while this model is for binary classification, for some reason
         # it was trained with two output logits.
         # we need to softmax them to get the prob right.
@@ -106,7 +107,7 @@ class BertPredicateDetector(PredicateDetector):
         # This is probably a mistake by either spacy or the nominal classifier
         # My bet is on the nominal classifier though since it had probably less data to train on.
         all_predicates = [
-            [pred for pred in doc_preds if doc[pred.index].pos_ in self.COMMON_NOUNS]
+            [pred for pred in doc_preds if doc[pred.index].tag_ in self.COMMON_NOUNS]
             for doc, doc_preds in zip(docs, all_predicates)
         ]
         # Use qanom to find a verbal form for nominal predicates

@@ -43,7 +43,7 @@ class QasemFrame:
 
 class PredicateDetector(ABC):
     def __call__(self, *args, **kwargs):
-        self.predict(*args, **kwargs)
+        return self.predict(*args, **kwargs)
 
     def predict(self, sentences: List[Union[TokenizedSentence, Doc]]) -> List[List[Predicate]]:
         ...
@@ -55,7 +55,6 @@ class ArgumentParser(ABC):
 
     def predict(self, samples: List[ArgInputExample]) -> List[QasemFrame]:
         ...
-
 
 
 def iter_batches(items, batch_size, desc=None, verbose=True):

@@ -1,7 +1,6 @@
 import torch
-from operator import itemgetter
 from typing import List
-from .common_defs import ArgInputExample, iter_batches, QasemFrame, QasemArgument
+from .common_defs import ArgInputExample, iter_batches, QasemFrame, QasemArgument, TokenizedSentence
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, PreTrainedModel, PreTrainedTokenizerBase
 
@@ -81,31 +80,20 @@ class T2TQasemArgumentParser:
     def __init__(self,
                  model: PreTrainedModel,
                  tokenizer: PreTrainedTokenizerBase,
-                 text_field="text",
-                 predicate_field="predicate",
                  batch_size=_DEFAULT_BATCH_SIZE,
                  num_beams=_DEFAULT_NUM_BEAMS,
                  max_length=_DEFAULT_MAX_LENGTH
-
     ):
         """
 
         :param model: The encoder-decoder model to use.
         :param tokenizer: An instance of the tokenizer to use
-        :param text_field: The name of the string field that
-        represents the pre-tokenized text in the input example.
-        default: "text"
-        :param predicate_field: The name of the integer field
-         that represents the predicate index in the input example,
-         default: "predicate"
         :param batch_size: The number of examples to process concurrently in a batch.
         :param num_beams: The number of beams in beam-search to use in decoding.
         :param max_length: Maximum length of the generated output Q&A pairs.
         """
         self.model = model.eval()
         self.tokenizer = tokenizer
-        self.text_fn = itemgetter(text_field)
-        self.predicate_fn = itemgetter(predicate_field)
         self.batch_size = batch_size
         self.num_beams = num_beams
         self.max_length = max_length
@@ -134,19 +122,17 @@ class T2TQasemArgumentParser:
         return cls(model, tokenizer, **kwargs)
 
     @staticmethod
-    def _prepare_text(pretokenized_text: str, predicate_index: int):
-        # example:
-        # {text: "The fox jumped over the fence", predicate_index: 2}
+    def _prepare_prompt(sample: ArgInputExample):
         # prompt:
         # "Generate QA pairs: The fox <extra_id_0> jumped <extra_id_0> over the fence"
-        tokens = pretokenized_text.split()
-
+        tokens = sample.sentence
+        predicate_index = sample.predicate.index
         hacked_tokens = T2TQasemArgumentParser.hack_unknown_tokens(tokens)
 
         # Prefix that starts the prompt (our T5-model was trained with this prefix)
         new_tokens = T2TQasemArgumentParser._PARSE_PREFIX_TOKENS[:]
         # take the sentence till the predicate token
-        new_tokens.extend(hacked_tokens[:predicate_index])
+        new_tokens.extend(hacked_tokens[:])
         # put the predicate token between two special tokens marking start and end.
         new_tokens.append(T2TQasemArgumentParser._PREDICATE_START_TOKEN)
         new_tokens.append(hacked_tokens[predicate_index])
@@ -157,11 +143,7 @@ class T2TQasemArgumentParser:
         return " ".join(new_tokens)
 
     def _prepare_batch(self, batch):
-        inputs = [
-            self._prepare_text(self.text_fn(item),
-                               self.predicate_fn(item))
-            for item in batch
-        ]
+        inputs = [self._prepare_prompt(item) for item in batch]
         inputs = self.tokenizer(inputs, return_tensors="pt", padding=True)
         return inputs
 
@@ -173,14 +155,13 @@ class T2TQasemArgumentParser:
                                       max_length=self.max_length)
         outputs = outputs.detach().cpu()
         decoded = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
-        # for now, ignore errors
-        post_processed, _ = [
-            self._postprocess(dec, self.text_fn(item))
+        post_processed = [
+            self._postprocess(dec, item.sentence)
             for dec, item in zip(decoded, batch)
         ]
         return post_processed
 
-    def _postprocess(self, decoded: str, pretokenized_text: str):
+    def _postprocess(self, decoded: str, tokens: TokenizedSentence):
         """
         Processes the generated output by a Text-to-Text model
         and parses it into a set of semantic arguments and their questions.
@@ -188,13 +169,10 @@ class T2TQasemArgumentParser:
         The correct format of the output is:
         <question_1>?answer_1;answer_2;<question_2>?<answer_1>...
         TODO(plroit): This format is ambiguous and hard to parse, need to re-train the model with a better format.
-        :param pretokenized_text: The original, pre-tokenized, text, represented as a string
-        with tokens separated by a single whitespace
+        :param tokens: The original, pre-tokenized, sentence tokens
         :return:
         """
         arguments = []
-        errors = []
-        tokens = pretokenized_text.split()
 
         hacked_tokens = T2TQasemArgumentParser.hack_unknown_tokens(tokens)
 
@@ -222,19 +200,22 @@ class T2TQasemArgumentParser:
                     answer.lower())
 
             if answer_start is None:
-                errors.append({"q": curr_question, "a": answer, "text": pretokenized_text})
+                # ignore errors for now
+                # errors.append({"q": curr_question, "a": answer, "text": " ".join(tokens)})
                 continue
             arg_text = " ".join(tokens[answer_start: answer_end]),
             arg = QasemArgument(arg_text, curr_question, answer_start, answer_end)
             arguments.append(arg)
-        return arguments, errors
+        return arguments
 
     def predict(self, items: List[ArgInputExample]) -> List[QasemFrame]:
+        if not isinstance(items[0].sentence, List):
+            raise ValueError("Sentences must be tokenized (list of tokens per sentence) when used with the ArgumentParser")
+
         all_qasem_arg_lists = []
         with torch.no_grad():
-            for batch in iter_batches(items, self.batch_size):
-                # for now, ignore errors.
-                post_processed, _ = self._predict_single_batch(batch)
+            for batch in iter_batches(items, self.batch_size, desc="Running argument parser"):
+                post_processed = self._predict_single_batch(batch)
                 all_qasem_arg_lists.extend(post_processed)
         return [
             QasemFrame(inp_item.sentence, inp_item.predicate, qasem_args)

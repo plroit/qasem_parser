@@ -2,7 +2,7 @@ from qasem_parser import QasemParser, ArgInputExample, T2TQasemArgumentParser
 from qasem_parser import Predicate
 
 untokenized_sentences = [
-    "The fox jumped over the fence."
+    "The fox jumped over the fence.",
     "Back in May, a signal consistent with that of a radio beacon was detected in the area, but nothing turned up that helped with the search."
 ]
 
@@ -23,7 +23,7 @@ for sentence, frames_per_sent in zip(untokenized_sentences, frames):
     predicates = [frame.predicate.lemma for frame in frames_per_sent]
     print(f"Predicates: {predicates}")
 
-frames = qasem_parser(tokenized_sentences)
+frames = qasem_parser(tokenized_sentences, is_pretokenized=True)
 for sentence, frames_per_sent in zip(tokenized_sentences, frames):
     print(sentence)
     predicates = [frame.predicate.lemma for frame in frames_per_sent]
