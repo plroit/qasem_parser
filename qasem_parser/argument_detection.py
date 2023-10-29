@@ -117,7 +117,7 @@ class T2TQasemArgumentParser:
     def from_pretrained(cls, path_or_model_name: str, **kwargs):
         tokenizer = AutoTokenizer.from_pretrained(path_or_model_name)
         model = AutoModelForSeq2SeqLM.from_pretrained(path_or_model_name)
-        device = get_device(kwargs)
+        device = get_device(**kwargs)
         model = model.to(device)
         return cls(model, tokenizer, **kwargs)
 
