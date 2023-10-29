@@ -17,7 +17,7 @@
 <div align="center">
   <a href="https://github.com/plroit/qasem_parser">
     <!-- This image was used originally in the paper: https://aclanthology.org/2021.emnlp-main.778.pdf -->
-    <img src="images/logo.png" alt="Logo">
+    <img src="images/logo.svg" alt="Logo">
   </a>
 
 <h3 align="center">Parser for Question-Answer based Semantics</h3>
