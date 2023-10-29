@@ -1,10 +1,12 @@
 from typing import List, Union
 
 import spacy
+import torch
 from qanom.candidate_extraction.candidate_extraction import get_verb_forms_from_lexical_resources
 from spacy.tokens import Doc
 from transformers import AutoModelForTokenClassification, AutoTokenizer, PreTrainedTokenizerBase, PreTrainedModel
 
+from . import torch_utils
 from .common_defs import PredicateDetector, TokenizedSentence, Predicate, iter_batches
 from .ling_utils import spacy_analyze
 
@@ -19,15 +21,14 @@ class BertPredicateDetector(PredicateDetector):
     @classmethod
     def from_pretrained(cls, nominal_classifier_path: str,
                         spacy_model_or_name:Union[str, spacy.Language] = 'en_core_web_sm', **kwargs):
-
-        # TODO(plroit): forgot to move the model to the device and handle gpu related input/output
+        device = torch_utils.get_device(**kwargs)
         if isinstance(spacy_model_or_name, str):
             nlp = spacy.load(spacy_model_or_name)
         else:
             nlp = spacy_model_or_name
         nom_tokenizer = AutoTokenizer.from_pretrained(nominal_classifier_path)
         nom_classifier = AutoModelForTokenClassification.from_pretrained(nominal_classifier_path)
-
+        nom_classifier = nom_classifier.to(device)
         return cls(nom_classifier, nom_tokenizer, nlp, **kwargs)
 
     def __init__(self,
@@ -36,7 +37,7 @@ class BertPredicateDetector(PredicateDetector):
                  spacy_lang: spacy.Language,
                  threshold=_DEFAULT_NOMINAL_THRESHOLD,
                  batch_size=_DEFAULT_BATCH_SIZE):
-        self.nom_model = nom_model
+        self.nom_model = nom_model.eval()
         self.nom_tokenizer = nom_tokenizer
         self.nlp = spacy_lang
         self.batch_size = batch_size
@@ -47,7 +48,7 @@ class BertPredicateDetector(PredicateDetector):
     @staticmethod
     def _is_verbal_predicate(tok: spacy.tokens.Token):
         is_verb = tok.pos_ == "VERB"
-        not_modal = tok.tag != "MD"
+        not_modal = tok.tag_ != "MD"
         not_be = tok.lemma_.lower() != "be"
         return is_verb and not_modal and not_be
 
@@ -65,6 +66,7 @@ class BertPredicateDetector(PredicateDetector):
         predicates = [[] for _ in range(len(batch))]
 
         inputs = self._prepare_inputs(batch)
+        inputs = inputs.to(self.nom_model.device)
         # forward call, let's get the logits
         logits = self.nom_model(**inputs).logits.detach().cpu()
         # while this model is for binary classification, for some reason
@@ -99,9 +101,10 @@ class BertPredicateDetector(PredicateDetector):
         # predict using the nominal classifier which token ids
         # are nominal predicates
         all_predicates: List[List[Predicate]] = []
-        for batch in iter_batches(docs, batch_size=self.batch_size):
-            predicates = self._detect_nominal_batch(batch)
-            all_predicates.extend(predicates)
+        with torch.no_grad():
+            for batch in iter_batches(docs, batch_size=self.batch_size):
+                predicates = self._detect_nominal_batch(batch)
+                all_predicates.extend(predicates)
 
         # remove predicates which are not common nouns
         # This is probably a mistake by either spacy or the nominal classifier
