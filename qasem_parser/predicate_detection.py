@@ -19,8 +19,12 @@ class BertPredicateDetector(PredicateDetector):
     COMMON_NOUNS = {"NN", "NNS"}
 
     @classmethod
-    def from_pretrained(cls, nominal_classifier_path: str,
-                        spacy_model_or_name:Union[str, spacy.Language] = 'en_core_web_sm', **kwargs):
+    def from_pretrained(
+            cls,
+            nominal_classifier_path: str,
+            spacy_model_or_name: Union[str, spacy.Language] = 'en_core_web_sm',
+            **kwargs
+    ):
         device = torch_utils.get_device(**kwargs)
         if isinstance(spacy_model_or_name, str):
             nlp = spacy.load(spacy_model_or_name)
