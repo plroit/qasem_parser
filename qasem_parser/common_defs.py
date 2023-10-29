@@ -19,6 +19,9 @@ class Predicate:
     index: int
     pos: str
 
+    def __repr__(self):
+        return f"{self.lemma}-{self.pos[0].lower()}"
+
 
 @dataclass(frozen=True)
 class QasemArgument:
@@ -26,6 +29,9 @@ class QasemArgument:
     question: str
     start_token: int
     end_token: int
+
+    def __repr__(self):
+        return f"{self.text} ({self.question})"
 
 
 @dataclass
@@ -39,6 +45,9 @@ class QasemFrame:
     sentence: TokenizedSentence
     predicate: Predicate
     arguments: List[QasemArgument]
+
+    def __repr__(self):
+        return f"{self.predicate}:  {' | '.join(str(a) for a in self.arguments)}"
 
 
 class PredicateDetector(ABC):

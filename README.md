@@ -54,6 +54,21 @@ sentences = [
 # frames[i] is a sublist of the semantic frames that occur within sentence[i] 
 frames: List[List[QasemFrame]] = parser(sentences)
 
+print(frames[0][1])
+# QasemFrame(predicate=Predicate(lemma='detect', text='detected', index=14, pos='VERB'),
+#            arguments=[QasemArgument(text='Back in May', 
+#                                     question='when was something detected?',
+#                                     start_token=0, end_token=3),
+#                       QasemArgument(text='a signal consistent with that of a radio beacon',
+#                                     question='what was detected?',
+#                                     start_token=4, end_token=13),
+#                       QasemArgument(text='in the area',
+#                                     question='where was something detected?', 
+#                                     start_token=15, end_token=18)
+#           sentence=['Back', 'in', 'May', ',', 'a', 'signal', 'consistent',...]
+#]) 
+
+
 # NOTE: if your text has already been tokenized and you want 
 # the parser to respect the token boundaries, use the flag ```is_pretokenized=True``` 
 sentences = [
@@ -70,6 +85,12 @@ for frames_per_sent in frames:
     frame = frames_per_sent[0]
     frame_args = [arg.text for arg in frame.arguments]
     print(frame.predicate.text, frame_args)
+# prints:
+# No of frames: 4, predicates: bound | occur | damage | preparation
+# bound ['extensive property damage', 'occur', 'occur even with the best preparation']
+# No of frames: 5, predicates: attend | following | made | election | audit
+# attend ['Afghanistan', 'the summit', 'after following the election in June']
+
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

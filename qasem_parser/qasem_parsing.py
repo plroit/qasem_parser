@@ -79,7 +79,8 @@ class QasemParser:
             # spacy will tokenize and analyze the sentences
             docs = list(tqdm(self._nlp.pipe(out_sentences),
                              desc="Running spacy for initial tokenization",
-                             total=len(out_sentences)))
+                             total=len(out_sentences),
+                             disable=len(out_sentences) < 100))
         else:
             # pretokenized=True
             if is_str:
