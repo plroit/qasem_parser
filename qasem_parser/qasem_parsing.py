@@ -74,7 +74,7 @@ class QasemParser:
         elif is_str:
             # this must be a single sentence, untokenized
             is_pretokenized = False
-            out_sentences = [[out_sentences]]
+            out_sentences = [out_sentences]
         elif is_list_of_str and is_pretokenized:
             # this is a single pre_tokenized sentence
             out_sentences = [out_sentences]
