@@ -13,7 +13,7 @@ tokenized_sentences = [
     "but the ongoing audit of votes has made this impossible .".split()
 ]
 
-joint_parser_path = r"C:\dev\pretrained\qasem_parser\flan_t5_large_joint"
+joint_parser_path = "cattana/flan-t5-large-qasem-joint-tokenized"
 qasem_parser = QasemParser.from_pretrained(joint_parser_path)
 
 # Simple use case, parse the sentences end-to-end:
@@ -28,7 +28,8 @@ for sentence, frames_per_sent in zip(tokenized_sentences, frames):
     print(sentence)
     for frame in frames_per_sent:
         print(frame)
-
+print()
+print()
 # Advanced use case, we know the predicate index in advance and have tokenized our sentence:
 examples = [ArgInputExample(tokenized_sentences[0], Predicate("damage", "damage", 4, "Noun"))]
 arg_parser = T2TQasemArgumentParser.from_pretrained(joint_parser_path)

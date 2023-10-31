@@ -53,44 +53,49 @@ sentences = [
 # frames is a list of lists, with one sublist per sentence such that len(frames) == len(sentences)  
 # frames[i] is a sublist of the semantic frames that occur within sentence[i] 
 frames: List[List[QasemFrame]] = parser(sentences)
+print(frames[1][0])
+# detect-v:  Back in May (when: when was something detected?) 
+#            | a signal consistent with that of a radio beacon (R1: what was detected?) 
+#            | in the area (where: where was something detected?) 
 
-print(frames[0][1])
-# QasemFrame(predicate=Predicate(lemma='detect', text='detected', index=14, pos='VERB'),
-#            arguments=[QasemArgument(text='Back in May', 
-#                                     question='when was something detected?',
-#                                     start_token=0, end_token=3),
-#                       QasemArgument(text='a signal consistent with that of a radio beacon',
-#                                     question='what was detected?',
-#                                     start_token=4, end_token=13),
-#                       QasemArgument(text='in the area',
-#                                     question='where was something detected?', 
-#                                     start_token=15, end_token=18)
-#           sentence=['Back', 'in', 'May', ',', 'a', 'signal', 'consistent',...]
-#]) 
-
-
-# NOTE: if your text has already been tokenized and you want 
-# the parser to respect the token boundaries, use the flag ```is_pretokenized=True``` 
-sentences = [
+# The parser also respects original tokenization
+# if the input is a batch of tokenized sentences  
+pretokenized_sentences = [
     "Unfortunately , extensive property damage is bound to occur even with the best preparation .".split(),
     "Afghanistan to attend the summit after following the election in June , "
     "but the ongoing audit of votes has made this impossible .".split()
 ]
-frames = parser(sentences, is_pretokenized=True)
+frames = parser(pretokenized_sentences)
 
 for frames_per_sent in frames:
-    # NOTE: frames_per_sent might be empty if no predicate is detected in the sentence.
-    in_sent_predicates = " | ".join(f.predicate.text for f in frames_per_sent) 
-    print(f"No of frames: {len(frames_per_sent)}, predicates: {in_sent_predicates}")
-    frame = frames_per_sent[0]
-    frame_args = [arg.text for arg in frame.arguments]
-    print(frame.predicate.text, frame_args)
-# prints:
-# No of frames: 4, predicates: bound | occur | damage | preparation
-# bound ['extensive property damage', 'occur', 'occur even with the best preparation']
-# No of frames: 5, predicates: attend | following | made | election | audit
-# attend ['Afghanistan', 'the summit', 'after following the election in June']
-
+    # NOTE: frames_per_sent might be empty if no predicate 
+    #       is detected in the sentence.
+    for frame in frames:
+        print(frame)
+    print()        
+# 
+# bind-v:  extensive property damage (R0: what is  bound  to do something?) 
+#          | occur even with the best preparation (R1: what is something bound  to do?)
+# occur-v:  extensive property damage (R0: what occurs?) 
+#          | even with the best preparation (how: how does something occur?)
+# damage-n:  extensive property damage (R0: what damages?)
+# prepare-n:  extensive property damage (R1: what is prepared?)
+#
+# call-v:  Plans (R0: what   called  for something?) 
+#          | the new President , or President-elect , of Afghanistan to attend the summit after following the election in June (R1: what did something call for?)
+# attend-v:  the new President , or President-elect , of Afghanistan (R0: who attends something?) 
+#          | the summit (R1: what does someone attend?)
+#          | after following the election in June (when: when does someone attend something?)
+# follow-v:  the election (R0: what is following?)
+#          | in June (when: when is something following?)
+# make-v:  the ongoing audit of votes (R0: what made something?) 
+#          | this impossible (R1: what did something make?)
+# plan-n:  Plans (R0: what had something?) 
+#          | originally called for the new President , or President-elect , of Afghanistan to attend the summit after following the election in June , but the ongoing audit of votes has made this impossible (R1: what did something have?)
+# elect-n:  the new President , or President-elect , of Afghanistan (R1: what was elected?) 
+#          | in June (when: when was something elected?)
+# audit-n:  votes (R1: what was audited?)
+#
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

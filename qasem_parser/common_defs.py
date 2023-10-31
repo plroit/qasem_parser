@@ -1,5 +1,5 @@
 import itertools
-from typing import List, Union
+from typing import List, Union, Optional
 
 from spacy.tokens import Doc
 from tqdm import tqdm
@@ -29,9 +29,11 @@ class QasemArgument:
     question: str
     start_token: int
     end_token: int
+    role: Optional[str] = None
 
     def __repr__(self):
-        return f"{self.text} ({self.question})"
+        # The fox (R0: who jumped)
+        return f"{self.text} ({self.role or ''}{': ' if self.role else ''}{self.question})"
 
 
 @dataclass

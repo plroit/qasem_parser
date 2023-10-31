@@ -1,10 +1,24 @@
 import torch
-from typing import List
+from typing import List, Tuple
+
+from qanom.question_info import get_slots, get_role
+
 from .common_defs import ArgInputExample, iter_batches, QasemFrame, QasemArgument, TokenizedSentence
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, PreTrainedModel, PreTrainedTokenizerBase
 
 from .torch_utils import get_device
+
+
+def find_answer_idx_with_fallback(tokens: List[str], answer: str):
+    # try to locate the answer in the original text
+    answer_start, answer_end = find_answer_idx(tokens, answer)
+    if answer_start is None:
+        # try case insensitive
+        answer_start, answer_end = find_answer_idx(
+            [tok.lower() for tok in tokens], answer.lower()
+        )
+    return answer_start, answer_end
 
 
 def find_answer_idx(tokens: List[str], answer: str):
@@ -75,6 +89,7 @@ class T2TQasemArgumentParser:
 
     _PREDICATE_START_TOKEN = "<extra_id_0>"
     _PREDICATE_END_TOKEN = "<extra_id_1>"
+    _QA_SEPARATOR = "<extra_id_2>"
     _PARSE_PREFIX_TOKENS = ["Generate",  "QA",  "pairs:"]
 
     def __init__(self,
@@ -127,18 +142,18 @@ class T2TQasemArgumentParser:
         # "Generate QA pairs: The fox <extra_id_0> jumped <extra_id_0> over the fence"
         tokens = sample.sentence
         predicate_index = sample.predicate.index
-        hacked_tokens = T2TQasemArgumentParser.hack_unknown_tokens(tokens)
+        # hacked_tokens = T2TQasemArgumentParser.hack_unknown_tokens(tokens)
 
         # Prefix that starts the prompt (our T5-model was trained with this prefix)
         new_tokens = T2TQasemArgumentParser._PARSE_PREFIX_TOKENS[:]
         # take the sentence till the predicate token
-        new_tokens.extend(hacked_tokens[:])
+        new_tokens.extend(tokens[:])
         # put the predicate token between two special tokens marking start and end.
         new_tokens.append(T2TQasemArgumentParser._PREDICATE_START_TOKEN)
-        new_tokens.append(hacked_tokens[predicate_index])
+        new_tokens.append(tokens[predicate_index])
         new_tokens.append(T2TQasemArgumentParser._PREDICATE_END_TOKEN)
         # put the rest of the sentence
-        new_tokens.extend(hacked_tokens[(predicate_index + 1):])
+        new_tokens.extend(tokens[(predicate_index + 1):])
         # voila, your prompt is ready
         return " ".join(new_tokens)
 
@@ -154,12 +169,30 @@ class T2TQasemArgumentParser:
                                       num_beams=self.num_beams,
                                       max_length=self.max_length)
         outputs = outputs.detach().cpu()
-        decoded = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        decoded = self.tokenizer.batch_decode(outputs, skip_special_tokens=False)
         post_processed = [
             self._postprocess(dec, item.sentence)
             for dec, item in zip(decoded, batch)
         ]
         return post_processed
+
+    def _parse_question(self, question: str) -> Tuple[str, str]:
+        # slots = get_slots(question,
+        #                   append_is_negated_slot=True,
+        #                   append_is_passive_slot=True,
+        #                   append_verb_slot_inflection=True)
+        role = get_role(question)
+        if role:
+            # let's not use qanom.SemanticRole enum
+            # it is coupled with prepositions in a specific dataset
+            # instead of representing the role as a syntactic position
+            # such as R0, R1, R2 or an adjunct and an optional preposition
+            role = role.name
+        clean_question = question.replace("_", "")
+        toks = [t.strip() for t in clean_question.split() if t.strip()]
+        if toks[-1] == "?":
+            clean_question = " ".join(toks[:-1]) + "?"
+        return clean_question, role
 
     def _postprocess(self, decoded: str, tokens: TokenizedSentence):
         """
@@ -167,45 +200,39 @@ class T2TQasemArgumentParser:
         and parses it into a set of semantic arguments and their questions.
         :param decoded: The decoded output string produced by beam-search or other decoding algorithm.
         The correct format of the output is:
-        <question_1>?answer_1;answer_2;<question_2>?<answer_1>...
-        TODO(plroit): This format is ambiguous and hard to parse, need to re-train the model with a better format.
+        <question_1>?answer_1;answer_2<extra_id_2><question_2>?<answer_1>...
         :param tokens: The original, pre-tokenized, sentence tokens
         :return:
         """
         arguments = []
 
-        hacked_tokens = T2TQasemArgumentParser.hack_unknown_tokens(tokens)
-
-        # format: Who said something? they;him;What was said? some things
-        splits = decoded.strip().split(";")
-        curr_question = None
-        for split in splits:
-            if "?" in split:
-                # this is a new question
-                question_mark_idx = split.index("?")
-                curr_question = split[:(question_mark_idx + 1)].strip()
-                answer = split[(question_mark_idx + 1):].strip()
-            else:
-                # This is a new answer to an existing question
-                answer = split.strip()
-            if curr_question is None:
-                # Must have at least one question
+        # we did not skip special tokens because we rely on <extra_id_2>
+        # now need to remove other special tokens by ourselves
+        decoded2 = decoded.replace(
+            self.tokenizer.pad_token, "").replace(
+            self.tokenizer.eos_token, "").strip(
+        )
+        qa_pairs = decoded2.split(self._QA_SEPARATOR)
+        for raw_qa_pair in qa_pairs:
+            qa_splits = raw_qa_pair.split("?", maxsplit=1)
+            if len(qa_splits) <= 1:
                 continue
-            # try to locate the answer in the original text
-            answer_start, answer_end = find_answer_idx(hacked_tokens, answer)
-            if answer_start is None:
-                # try case insensitive
-                answer_start, answer_end = find_answer_idx(
-                    [tok.lower() for tok in hacked_tokens],
-                    answer.lower())
+            question = qa_splits[0].strip() + "?"
+            question, role = self._parse_question(question)
+            # this is the not a good choice since
+            # a ";" sign may be part of an answer..
+            # but that's how the model was trained :-(
+            answers = qa_splits[1].split(";")
+            answers = [ans.strip() for ans in answers]
+            for answer in answers:
+                # try to locate the answer in the original text
+                answer_start, answer_end = find_answer_idx_with_fallback(tokens, answer)
+                if answer_start is None:
+                    continue
+                arg_text = " ".join(tokens[answer_start: answer_end])
+                arg = QasemArgument(arg_text, question, answer_start, answer_end, role)
+                arguments.append(arg)
 
-            if answer_start is None:
-                # ignore errors for now
-                # errors.append({"q": curr_question, "a": answer, "text": " ".join(tokens)})
-                continue
-            arg_text = " ".join(tokens[answer_start: answer_end])
-            arg = QasemArgument(arg_text, curr_question, answer_start, answer_end)
-            arguments.append(arg)
         return arguments
 
     def predict(self, items: List[ArgInputExample]) -> List[QasemFrame]:
