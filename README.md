@@ -43,7 +43,7 @@ Reimplementation of the [QA-SEM pipeline](https://github.com/kleinay/QASem/) wit
 ```python
 from typing import List
 from qasem_parser import QasemParser, QasemFrame
-arg_parser_path = "<argument parser model path>"
+arg_parser_path = "cattana/flan-t5-large-qasem-joint-tokenized"
 parser = QasemParser.from_pretrained(arg_parser_path)
 
 sentences = [
