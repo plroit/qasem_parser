@@ -20,14 +20,14 @@ qasem_parser = QasemParser.from_pretrained(joint_parser_path)
 frames = qasem_parser(untokenized_sentences)
 for sentence, frames_per_sent in zip(untokenized_sentences, frames):
     print(sentence)
-    predicates = [frame.predicate.lemma for frame in frames_per_sent]
-    print(f"Predicates: {predicates}")
+    for frame in frames_per_sent:
+        print(frame)
 
 frames = qasem_parser(tokenized_sentences, is_pretokenized=True)
 for sentence, frames_per_sent in zip(tokenized_sentences, frames):
     print(sentence)
-    predicates = [frame.predicate.lemma for frame in frames_per_sent]
-    print(f"Predicates: {predicates}")
+    for frame in frames_per_sent:
+        print(frame)
 
 # Advanced use case, we know the predicate index in advance and have tokenized our sentence:
 examples = [ArgInputExample(tokenized_sentences[0], Predicate("damage", "damage", 4, "Noun"))]

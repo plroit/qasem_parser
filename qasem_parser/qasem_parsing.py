@@ -13,6 +13,7 @@ from .ling_utils import spacy_analyze
 
 
 _DEFAULT_NOMINAL_DETECTOR = "kleinay/nominalization-candidate-classifier"
+_DEFAULT_JOINT_ARG_PARSER = "cattana/flan-t5-large-qasem-joint-tokenized"
 
 # This is the old parser, it was trained with a different format
 # for questions and answers, don't use with the current version of code
@@ -67,30 +68,33 @@ class QasemParser:
         is_str = isinstance(sentences, str)
         is_list_of_str = isinstance(sentences, list) and isinstance(sentences[0], str)
         is_list_of_list = isinstance(sentences, list) and isinstance(sentences[0], list)
-        if not is_pretokenized:
-            # in the untokenized case a single string is a sentence.
-            if is_str:
-                out_sentences = [sentences]
-            elif is_list_of_list:
-                # can't have List[List[str]] in the untokenized case
-                raise ValueError("pretokenized=False, sentences must be either "
-                                 "a list of strings each representing a sentence "
-                                 "or a single string for a single sentence ")
+        if is_list_of_list:
+            # this must be pre-tokenized
+            is_pretokenized = True
+        elif is_str:
+            # this must be a single sentence, untokenized
+            is_pretokenized = False
+            out_sentences = [[out_sentences]]
+        elif is_list_of_str and is_pretokenized:
+            # this is a single pre_tokenized sentence
+            out_sentences = [out_sentences]
+        elif is_list_of_str and not is_pretokenized:
+            # this is a list of untokenized sentences
+            pass
+        # these conditions must hold now:
+        if is_pretokenized:
+            assert isinstance(out_sentences[0], List)
+        else:
+            assert isinstance(out_sentences[0], str)
+
+        if is_pretokenized:
+            docs = spacy_analyze(out_sentences, self._nlp)
+        else:
             # spacy will tokenize and analyze the sentences
             docs = list(tqdm(self._nlp.pipe(out_sentences),
                              desc="Running spacy for initial tokenization",
                              total=len(out_sentences),
                              disable=len(out_sentences) < 100))
-        else:
-            # pretokenized=True
-            if is_str:
-                raise ValueError(
-                    "pretokenized=True, sentences must be a list of "
-                    "tokens or a batch of lists of tokens")
-            # if it is a single pre-tokenized example
-            if is_list_of_str:
-                out_sentences = [sentences]
-            docs = spacy_analyze(out_sentences, self._nlp)
         return docs
 
     def __call__(self,
@@ -99,6 +103,40 @@ class QasemParser:
                                   List[TokenizedSentence],
                                   List[UntokenizedSentence]],
                  is_pretokenized=False) -> List[List[QasemFrame]]:
+        """
+        Semantically parses the sentences.
+        For example:
+        sentences = [
+            'The fox jumped over the fence .'.split(),
+            'Unfortunately , extensive property damage is bound to occur even with the best preparation .'.split()
+        ]
+        qasem_frames = qasem_parser(sentences)
+        #
+        # First sentence frames:
+        # [jump-v:  The fox (who jumped?) | over the fence (where did someone jump?)]
+        print(qasem_frames[0])
+        #
+        # Second sentence frames:
+        # [
+        #   bind-v:  extensive property damage (what is bound to do something?) | occur (what is something bound to do?) | occur even with the best preparation (what is something bound to do?)
+        #   occur-v:  extensive property damage (what occurs?) | even with the best preparation (how does something occur?)
+        #   damage-n:  extensive property (what is damaged?) | even with the best preparation (how is something damaged?)
+        #   prepare-n:  extensive property damage (what is prepared?)
+        # ]
+        print(qasem_frames[1])
+
+        :param sentences:
+        :param is_pretokenized: Used to disambiguate between
+        List[UntokenizedSentence] and TokenizedSentence
+        Since both types are a list of strings.
+        If is_tokenized=True then the input is handled as a single tokenized sentence
+        where each string in the list is a single token (word).
+        If is_tokenize=false then the input is handled as a list of untokenized sentence
+        where each string in the list is a whole sentence.
+        :return: A list with the same length as the input sentences.
+        result[i] is a list of QASem frames that occur in the ith sentence.
+        The list of frames may be empty if no predicate is detected in the ith sentence.
+        """
 
         # after normalization, sentences is a batch of tokenized sentences.
         docs = self._normalize_input(sentences, is_pretokenized)

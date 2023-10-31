@@ -203,7 +203,7 @@ class T2TQasemArgumentParser:
                 # ignore errors for now
                 # errors.append({"q": curr_question, "a": answer, "text": " ".join(tokens)})
                 continue
-            arg_text = " ".join(tokens[answer_start: answer_end]),
+            arg_text = " ".join(tokens[answer_start: answer_end])
             arg = QasemArgument(arg_text, curr_question, answer_start, answer_end)
             arguments.append(arg)
         return arguments
