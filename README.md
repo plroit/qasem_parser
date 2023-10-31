@@ -70,7 +70,7 @@ frames = parser(pretokenized_sentences)
 for frames_per_sent in frames:
     # NOTE: frames_per_sent might be empty if no predicate 
     #       is detected in the sentence.
-    for frame in frames:
+    for frame in frames_per_sent:
         print(frame)
     print()        
 # 
