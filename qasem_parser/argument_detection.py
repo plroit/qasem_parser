@@ -179,10 +179,6 @@ class T2TQasemArgumentParser:
         return post_processed
 
     def _parse_question(self, question: str) -> Tuple[str, str]:
-        # slots = get_slots(question,
-        #                   append_is_negated_slot=True,
-        #                   append_is_passive_slot=True,
-        #                   append_verb_slot_inflection=True)
         role = get_role(question)
         if role:
             # let's not use qanom.SemanticRole enum
@@ -194,6 +190,8 @@ class T2TQasemArgumentParser:
         toks = [t.strip() for t in clean_question.split() if t.strip()]
         if toks[-1] == "?":
             clean_question = " ".join(toks[:-1]) + "?"
+        else:
+            clean_question = " ".join(toks)
         return clean_question, role
 
     def _postprocess(self, decoded: str, tokens: TokenizedSentence):
