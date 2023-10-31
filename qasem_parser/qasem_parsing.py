@@ -138,7 +138,9 @@ class QasemParser:
         The list of frames may be empty if no predicate is detected in the ith sentence.
         """
 
-        # after normalization, sentences is a batch of tokenized sentences.
+        if not sentences:
+            return []
+        # after normalization, sentences is a batch of spacy Docs.
         docs = self._normalize_input(sentences, is_pretokenized)
         predicates = self.predicate_detector(docs)
         arg_input_samples = create_arg_input_sample(docs, predicates)

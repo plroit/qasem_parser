@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qasem_parser"
-version = "1.1.0"
+version = "1.1.2"
 description = "QA based Semantics"
 readme = "README.md"
 authors = [{ name = "Paul Roit", email = "plroit@gmail.com" }]
@@ -32,4 +32,4 @@ dev = []
 Homepage = "https://github.com/plroit/qasem_parser"
 
 [tool.setuptools.packages.find]
-exclude = ["docs*", "tests*", "images*"]
+exclude = ["docs*", "tests*", "images*", "examples*"]
