@@ -149,9 +149,11 @@ class T2TQasemArgumentParser:
         # take the sentence till the predicate token
         new_tokens.extend(tokens[:])
         # put the predicate token between two special tokens marking start and end.
-        new_tokens.append(T2TQasemArgumentParser._PREDICATE_START_TOKEN)
-        new_tokens.append(tokens[predicate_index])
-        new_tokens.append(T2TQasemArgumentParser._PREDICATE_END_TOKEN)
+        # The model is trained without spaces between the special tokens and the predicate
+        marked_predicate = "".join([T2TQasemArgumentParser._PREDICATE_START_TOKEN,
+                                    tokens[predicate_index],
+                                    T2TQasemArgumentParser._PREDICATE_END_TOKEN])
+        new_tokens.append(marked_predicate)
         # put the rest of the sentence
         new_tokens.extend(tokens[(predicate_index + 1):])
         # voila, your prompt is ready
