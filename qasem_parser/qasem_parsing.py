@@ -68,6 +68,7 @@ class QasemParser:
         is_str = isinstance(sentences, str)
         is_list_of_str = isinstance(sentences, list) and isinstance(sentences[0], str)
         is_list_of_list = isinstance(sentences, list) and isinstance(sentences[0], list)
+        is_list_of_docs = isinstance(sentences, list) and isinstance(sentences[0], Doc)
         if is_list_of_list:
             # this must be pre-tokenized
             is_pretokenized = True
@@ -81,6 +82,9 @@ class QasemParser:
         elif is_list_of_str and not is_pretokenized:
             # this is a list of untokenized sentences
             pass
+        elif is_list_of_docs: # to capture already spacy tokenized sentences
+            return sentences
+
         # these conditions must hold now:
         if is_pretokenized:
             assert isinstance(out_sentences[0], List)
