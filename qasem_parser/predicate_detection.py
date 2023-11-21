@@ -100,6 +100,19 @@ class BertPredicateDetector(PredicateDetector):
             new_pred = Predicate(verb_forms[0], pred.text, pred.index, pred.pos)
             new_preds.append(new_pred)
         return new_preds
+    
+    def detect_nominal_spacy(self, docs: List[Doc]) -> List[List[Predicate]]:
+        all_predicates: List[List[Predicate]] = []
+        for doc in docs:
+            predicate_docs = []
+            for nn in doc._.nominalizations:
+                predicate_docs.append(
+                    Predicate(nn._.verb_form, nn.text, nn.index, nn.pos)
+                )
+            all_predicates.append(predicate_docs)
+
+        return all_predicates
+
 
     def detect_nominal(self, docs: List[Doc]) -> List[List[Predicate]]:
         # predict using the nominal classifier which token ids
@@ -144,7 +157,8 @@ class BertPredicateDetector(PredicateDetector):
         else:
             docs = spacy_analyze(sentences, self.nlp)
         verb_predicates = self.detect_verbal(docs)
-        nom_predicates = self.detect_nominal(docs)
+        # nom_predicates = self.detect_nominal(docs)
+        nom_predicates = self.detect_nominal_spacy(docs)
         all_predicates = [verb_preds + noun_preds
                           for verb_preds, noun_preds
                           in zip(verb_predicates, nom_predicates)]
