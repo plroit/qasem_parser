@@ -107,7 +107,7 @@ class BertPredicateDetector(PredicateDetector):
             predicate_docs = []
             for nn in doc._.nominalizations:
                 predicate_docs.append(
-                    Predicate(nn._.verb_form, nn.text, nn.index, nn.pos)
+                    Predicate(nn._.verb_form, nn.text, nn.i, nn.pos)
                 )
             all_predicates.append(predicate_docs)
 

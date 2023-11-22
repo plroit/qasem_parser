@@ -52,6 +52,8 @@ class QasemParser:
     ):
         # TODO: make this more generic? how to initialize the correct parser class just from the model path?
         nlp = spacy.load(spacy_lang)
+        nlp.add_pipe("nominalization_detector", after="tagger", 
+             config={"threshold": 0.75, "device": -1})
         arg_parser = T2TQasemArgumentParser.from_pretrained(arg_parser_path)
         predicate_detector = BertPredicateDetector.from_pretrained(nom_predicate_detector_path, nlp)
         return cls(arg_parser, predicate_detector, nlp)
