@@ -73,13 +73,14 @@ class BertPredicateDetector(PredicateDetector):
         inputs = inputs.to(self.nom_model.device)
         special_tokens_mask = inputs.pop("special_tokens_mask")
         # forward call, let's get the logits
-        logits = self.nom_model(**inputs).logits.detach().cpu()
+        logits = self.nom_model(**inputs).logits.detach()
         # while this model is for binary classification, for some reason
         # it was trained with two output logits.
         # we need to softmax them to get the prob right.
         probs = logits.softmax(axis=-1)
         positive_probs = probs[:, :, self.positive_label_idx]
         is_nominal_predicate = (positive_probs > self.threshold) & ~special_tokens_mask
+        is_nominal_predicate = is_nominal_predicate.cpu()
         batch_indices, seq_indices = is_nominal_predicate.nonzero(as_tuple=True)
         for batch_idx, seq_idx in zip(batch_indices, seq_indices):
             doc = batch[batch_idx]
