@@ -80,7 +80,7 @@ def find_answer_from_token(tokens: List[str], start_token_idx: int, answer: str)
     return None
 
 
-_DEFAULT_BATCH_SIZE = 32
+_DEFAULT_BATCH_SIZE = 4
 _DEFAULT_NUM_BEAMS = 4
 _DEFAULT_MAX_LENGTH = 256
 
