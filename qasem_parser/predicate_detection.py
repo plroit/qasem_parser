@@ -61,7 +61,7 @@ class BertPredicateDetector(PredicateDetector):
         for sent_idx, doc in enumerate(docs):
             for tok in doc:
                 if self._is_verbal_predicate(tok):
-                    predicate = Predicate(tok.lemma_, tok.text, tok.i, tok.pos_)
+                    predicate = Predicate(tok.lemma_, tok.text, tok.i, tok.pos_, 1.0)
                     predicates[sent_idx].append(predicate)
         return predicates
 
@@ -73,13 +73,14 @@ class BertPredicateDetector(PredicateDetector):
         inputs = inputs.to(self.nom_model.device)
         special_tokens_mask = inputs.pop("special_tokens_mask")
         # forward call, let's get the logits
-        logits = self.nom_model(**inputs).logits.detach().cpu()
+        logits = self.nom_model(**inputs).logits.detach()
         # while this model is for binary classification, for some reason
         # it was trained with two output logits.
         # we need to softmax them to get the prob right.
         probs = logits.softmax(axis=-1)
         positive_probs = probs[:, :, self.positive_label_idx]
         is_nominal_predicate = (positive_probs > self.threshold) & ~special_tokens_mask
+        is_nominal_predicate = is_nominal_predicate.cpu()
         batch_indices, seq_indices = is_nominal_predicate.nonzero(as_tuple=True)
         for batch_idx, seq_idx in zip(batch_indices, seq_indices):
             doc = batch[batch_idx]
@@ -88,7 +89,8 @@ class BertPredicateDetector(PredicateDetector):
             predicate = Predicate(pred_token.lemma_.lower(),
                                   pred_token.text,
                                   word_idx,
-                                  pred_token.pos_)
+                                  pred_token.pos_,
+                                  positive_probs[batch_idx][seq_idx].item())
             predicates[batch_idx].append(predicate)
         return predicates
 
@@ -98,7 +100,7 @@ class BertPredicateDetector(PredicateDetector):
             verb_forms, is_ok = get_verb_forms_from_lexical_resources(pred.lemma)
             if not is_ok:
                 continue
-            new_pred = Predicate(verb_forms[0], pred.text, pred.index, pred.pos)
+            new_pred = Predicate(verb_forms[0], pred.text, pred.index, pred.pos, pred.score)
             new_preds.append(new_pred)
         return new_preds
     
@@ -108,7 +110,7 @@ class BertPredicateDetector(PredicateDetector):
             predicate_docs = []
             for nn in doc._.nominalizations:
                 predicate_docs.append(
-                    Predicate(nn._.verb_form, nn.text, nn.i, nn.pos)
+                    Predicate(nn._.verb_form, nn.text, nn.i, nn.pos, nn._.is_nominalization_confidence)
                 )
             all_predicates.append(predicate_docs)
 
@@ -159,8 +161,8 @@ class BertPredicateDetector(PredicateDetector):
         else:
             docs = spacy_analyze(sentences, self.nlp)
         verb_predicates = self.detect_verbal(docs)
-        # nom_predicates = self.detect_nominal(docs)
-        nom_predicates = self.detect_nominal_spacy(docs)
+        nom_predicates = self.detect_nominal(docs)
+        # nom_predicates = self.detect_nominal_spacy(docs)
         all_predicates = [verb_preds + noun_preds
                           for verb_preds, noun_preds
                           in zip(verb_predicates, nom_predicates)]

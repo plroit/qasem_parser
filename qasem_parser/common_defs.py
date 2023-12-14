@@ -18,6 +18,7 @@ class Predicate:
     text: str
     index: int
     pos: str
+    score: float
 
     def __repr__(self):
         return f"{self.lemma}-{self.pos[0].lower()}"
