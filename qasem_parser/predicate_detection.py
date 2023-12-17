@@ -61,7 +61,7 @@ class BertPredicateDetector(PredicateDetector):
         for sent_idx, doc in enumerate(docs):
             for tok in doc:
                 if self._is_verbal_predicate(tok):
-                    predicate = Predicate(tok.lemma_, tok.text, tok.i, tok.pos_, 1.0)
+                    predicate = Predicate(tok.lemma_, tok.text, tok.i, tok.pos_)
                     predicates[sent_idx].append(predicate)
         return predicates
 

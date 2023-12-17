@@ -18,7 +18,7 @@ class Predicate:
     text: str
     index: int
     pos: str
-    score: float
+    score: Optional[float] = None # score of the nominalization
 
     def __repr__(self):
         return f"{self.lemma}-{self.pos[0].lower()}"
