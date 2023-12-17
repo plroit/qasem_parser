@@ -232,7 +232,7 @@ class T2TQasemArgumentParser:
                 if answer_start is None:
                     continue
                 arg_text = " ".join(tokens[answer_start: answer_end])
-                arg = QasemArgument(arg_text, question, answer_start, answer_end, role, verb_token_id)
+                arg = QasemArgument(arg_text, question, answer_start, answer_end, verb_token_id, role)
                 arguments.append(arg)
 
         return arguments
