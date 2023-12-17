@@ -42,7 +42,8 @@ class LocUnfaith:
           "answer": frame.text,
           "answerStartToken": [answer_start_token_index],
           "answerEndToken": [answer_end_token_index],
-          "answerId": f'{answer_start_token_index}-{answer_end_token_index}'
+          "answerId": f'{answer_start_token_index}-{answer_end_token_index}',
+          "verbTokenId": frame.verb_token_id
         })
 
     return qas     
@@ -172,15 +173,12 @@ class LocUnfaith:
 
 if __name__=='__main__':
   nlp = spacy.load("en_core_web_lg")
-  nlp.add_pipe("nominalization_detector", after="tagger", 
-             config={"threshold": 0.75, "device": -1})
   arg_parser_path = "cattana/flan-t5-xl-qasem-joint-tokenized"
   parser = QasemParser.from_pretrained(arg_parser_path, spacy_lang="en_core_web_lg")
 
-  # df = pd.read_csv("../AggreFact/data/aggre_fact_sota.csv")
-  # df = pd.read_json("/home/nlp/ariecattan/summarization/factuality/cliff/cliff_raw.jsonl")
   with jsonlines.open("/home/nlp/ariecattan/summarization/factuality/cliff/cliff_raw.jsonl", "r") as f:
     data = [x for x in f]
+
   df = pd.DataFrame(data)
   df["label"] = df["labels"].apply(lambda labels: True if sum(1 for x in labels if x == "correct") == len(labels) else False) 
   df["origin"] = df["datasource"]
@@ -189,13 +187,11 @@ if __name__=='__main__':
   
 
   # run spacy on source and summary 
-  spacy_docs_source = list(tqdm(nlp.pipe(df["article"], disable=["nominalization_detector"]), desc='Running spacy on source', total=len(df)))
+  spacy_docs_source = list(tqdm(nlp.pipe(df["article"]), desc='Running spacy on source', total=len(df)))
   df["spacy_source"] = spacy_docs_source
-  # spacy_docs_summary = list(tqdm(nlp.pipe(df["summary"]), desc='Running spacy on summary', total=len(df)))
-  # df["spacy_summary"] = spacy_docs_summary
 
   # run spacy on pretokenized summary to further split it into sentences
-  df["spacy_inputs"] =  df["summary_tokens"].progress_apply(lambda tokens: Doc(words=tokens, vocab=nlp.vocab)) 
+  df["spacy_inputs"] = df["summary_tokens"].progress_apply(lambda tokens: Doc(words=tokens, vocab=nlp.vocab)) 
   docs = list(tqdm(nlp.pipe(list(df["spacy_inputs"])), desc="Running spacy on summary", total=len(df)))
   df["spacy_summary"] = docs
 
@@ -208,23 +204,9 @@ if __name__=='__main__':
   # this is a hack for re-running spacy on tokenized sentences, while reseting the index
   df_sentences["input_for_qasem"] = df_sentences["sentences"].apply(lambda sent: [token.text for token in sent]) 
   
-  # run qasem parser
-  # frames = list(tqdm(parser(df_sentences["input_for_qasem"].tolist()), desc='Running qasem parser...', total=len(df_sentences)))
-  
-  bugs = []
-  for i, sentence in tqdm(enumerate(df_sentences["input_for_qasem"])):
-    try:
-      predicates = parser.predicate_detector.predict([sentence])
-    except:
-      bugs.append(sentence)
-
-  exit()
-  '''
-  
-  
-  '''
+  # run qasem parser 
   frames = parser(df_sentences["input_for_qasem"].tolist())
-  df_sentences["qa_frames"] = frames 
+  df_sentences["qa_frames"] = frames   
 
   # create json file for each summary
   if not os.path.exists("data/cliff_t5_xl"):

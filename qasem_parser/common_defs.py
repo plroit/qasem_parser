@@ -31,6 +31,7 @@ class QasemArgument:
     start_token: int
     end_token: int
     role: Optional[str] = None
+    verb_token_id: int # token id of the verb in the question 
 
     def __repr__(self):
         # The fox (R0: who jumped)

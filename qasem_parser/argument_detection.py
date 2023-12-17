@@ -186,13 +186,15 @@ class T2TQasemArgumentParser:
             # instead of representing the role as a syntactic position
             # such as R0, R1, R2 or an adjunct and an optional preposition
             role = role.name
+        slots = get_slots(question)
         clean_question = question.replace("_", "")
         toks = [t.strip() for t in clean_question.split() if t.strip()]
+        verb_token_id = toks.index(slots["verb"])
         if toks[-1] == "?":
             clean_question = " ".join(toks[:-1]) + "?"
         else:
             clean_question = " ".join(toks)
-        return clean_question, role
+        return clean_question, role, verb_token_id
 
     def _postprocess(self, decoded: str, tokens: TokenizedSentence):
         """
@@ -218,7 +220,7 @@ class T2TQasemArgumentParser:
             if len(qa_splits) <= 1:
                 continue
             question = qa_splits[0].strip() + "?"
-            question, role = self._parse_question(question)
+            question, role, verb_token_id = self._parse_question(question)
             # this is the not a good choice since
             # a ";" sign may be part of an answer..
             # but that's how the model was trained :-(
@@ -230,7 +232,7 @@ class T2TQasemArgumentParser:
                 if answer_start is None:
                     continue
                 arg_text = " ".join(tokens[answer_start: answer_end])
-                arg = QasemArgument(arg_text, question, answer_start, answer_end, role)
+                arg = QasemArgument(arg_text, question, answer_start, answer_end, role, verb_token_id)
                 arguments.append(arg)
 
         return arguments
