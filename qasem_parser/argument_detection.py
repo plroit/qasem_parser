@@ -90,6 +90,7 @@ class T2TQasemArgumentParser:
     _PREDICATE_START_TOKEN = "<extra_id_0>"
     _PREDICATE_END_TOKEN = "<extra_id_1>"
     _QA_SEPARATOR = "<extra_id_2>"
+    _ANS_SEPARATOR = "<extra_id_3>"
     _PARSE_PREFIX_TOKENS = ["Generate",  "QA",  "pairs:"]
 
     def __init__(self,
@@ -198,7 +199,7 @@ class T2TQasemArgumentParser:
             clean_question = " ".join(toks[:-1]) + "?"
         else:
             clean_question = " ".join(toks)
-        return clean_question, role, verb_token_id
+        return clean_question, role, verb_token_id[0]
 
     def _postprocess(self, decoded: str, tokens: TokenizedSentence):
         """
@@ -230,7 +231,7 @@ class T2TQasemArgumentParser:
             # this is the not a good choice since
             # a ";" sign may be part of an answer..
             # but that's how the model was trained :-(
-            answers = qa_splits[1].split(";")
+            answers = qa_splits[1].split(self._ANS_SEPARATOR)
             answers = [ans.strip() for ans in answers]
             for answer in answers:
                 # try to locate the answer in the original text

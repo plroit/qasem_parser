@@ -82,16 +82,21 @@ class BertPredicateDetector(PredicateDetector):
         is_nominal_predicate = (positive_probs > self.threshold) & ~special_tokens_mask
         is_nominal_predicate = is_nominal_predicate.cpu()
         batch_indices, seq_indices = is_nominal_predicate.nonzero(as_tuple=True)
+        all_predicates = set()
         for batch_idx, seq_idx in zip(batch_indices, seq_indices):
             doc = batch[batch_idx]
             word_idx = inputs.token_to_word(batch_idx, seq_idx)
             pred_token = doc[word_idx]
+            idx = (batch_idx.item(), word_idx)
+            if idx in all_predicates:
+                continue
             predicate = Predicate(pred_token.lemma_.lower(),
                                   pred_token.text,
                                   word_idx,
                                   pred_token.pos_,
                                   positive_probs[batch_idx][seq_idx].item())
             predicates[batch_idx].append(predicate)
+            all_predicates.add(idx)
         return predicates
 
     def transform_with_verb_forms(self, doc_preds: List[Predicate]) -> List[Predicate]:
