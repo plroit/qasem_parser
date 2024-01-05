@@ -90,6 +90,11 @@ class T2TQasemArgumentParser:
     _PREDICATE_START_TOKEN = "<extra_id_0>"
     _PREDICATE_END_TOKEN = "<extra_id_1>"
     _QA_SEPARATOR = "<extra_id_2>"
+    _ANSWER_SEPARATOR = ";"
+
+    # Apply to the newer models once they are uploaded to HF-hub
+    # _ANSWER_SEPARATOR = "<extra_id_3>"
+
     _PARSE_PREFIX_TOKENS = ["Generate",  "QA",  "pairs:"]
 
     def __init__(self,
@@ -97,7 +102,12 @@ class T2TQasemArgumentParser:
                  tokenizer: PreTrainedTokenizerBase,
                  batch_size=_DEFAULT_BATCH_SIZE,
                  num_beams=_DEFAULT_NUM_BEAMS,
-                 max_length=_DEFAULT_MAX_LENGTH
+                 max_length=_DEFAULT_MAX_LENGTH,
+                 predicate_start_token=_PREDICATE_START_TOKEN,
+                 predicate_end_token=_PREDICATE_END_TOKEN,
+                 qa_separator=_QA_SEPARATOR,
+                 answer_separator=_ANSWER_SEPARATOR,
+
     ):
         """
 
@@ -106,12 +116,20 @@ class T2TQasemArgumentParser:
         :param batch_size: The number of examples to process concurrently in a batch.
         :param num_beams: The number of beams in beam-search to use in decoding.
         :param max_length: Maximum length of the generated output Q&A pairs.
+        :param predicate_start_token: a marker token to designate the predicate
+        :param predicate_end_token: a marker token to designate the predicate
+        :param qa_separator: a marker token to distinguish different QA pairs
+        :param ansewr_separator: a marker token to distinguish different answers within a QA pair.
         """
         self.model = model.eval()
         self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.num_beams = num_beams
         self.max_length = max_length
+        self.predicate_start_end_markers = predicate_start_token, predicate_end_token
+        self.qa_separator = qa_separator
+        self.answer_separator = answer_separator
+
 
     def __call__(self, *args, **kwargs):
         return self.predict(*args, **kwargs)
@@ -135,14 +153,12 @@ class T2TQasemArgumentParser:
         device = get_device(**kwargs)
         model = model.to(device)
         return cls(model, tokenizer, **kwargs)
-
-    @staticmethod
-    def _prepare_prompt(sample: ArgInputExample):
+    
+    def _prepare_prompt(self, sample: ArgInputExample):
         # prompt:
         # "Generate QA pairs: The fox <extra_id_0> jumped <extra_id_0> over the fence"
         tokens = sample.sentence
         predicate_index = sample.predicate.index
-        # hacked_tokens = T2TQasemArgumentParser.hack_unknown_tokens(tokens)
 
         # Prefix that starts the prompt (our T5-model was trained with this prefix)
         new_tokens = T2TQasemArgumentParser._PARSE_PREFIX_TOKENS[:]
@@ -150,9 +166,10 @@ class T2TQasemArgumentParser:
         new_tokens.extend(tokens[:])
         # put the predicate token between two special tokens marking start and end.
         # The model is trained without spaces between the special tokens and the predicate
-        marked_predicate = "".join([T2TQasemArgumentParser._PREDICATE_START_TOKEN,
+        pred_start_marker, pred_end_marker = self.predicate_start_end_markers
+        marked_predicate = "".join([pred_start_marker,
                                     tokens[predicate_index],
-                                    T2TQasemArgumentParser._PREDICATE_END_TOKEN])
+                                    pred_end_marker])
         new_tokens.append(marked_predicate)
         # put the rest of the sentence
         new_tokens.extend(tokens[(predicate_index + 1):])
@@ -212,7 +229,7 @@ class T2TQasemArgumentParser:
             self.tokenizer.pad_token, "").replace(
             self.tokenizer.eos_token, "").strip(
         )
-        qa_pairs = decoded2.split(self._QA_SEPARATOR)
+        qa_pairs = decoded2.split(self.qa_separator)
         for raw_qa_pair in qa_pairs:
             qa_splits = raw_qa_pair.split("?", maxsplit=1)
             if len(qa_splits) <= 1:
@@ -222,7 +239,7 @@ class T2TQasemArgumentParser:
             # this is the not a good choice since
             # a ";" sign may be part of an answer..
             # but that's how the model was trained :-(
-            answers = qa_splits[1].split(";")
+            answers = qa_splits[1].split(self.answer_separator)
             answers = [ans.strip() for ans in answers]
             for answer in answers:
                 # try to locate the answer in the original text
