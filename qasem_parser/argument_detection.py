@@ -195,22 +195,6 @@ class T2TQasemArgumentParser:
         ]
         return post_processed
 
-    def _parse_question(self, question: str) -> Tuple[str, str]:
-        role = get_role(question)
-        if role:
-            # let's not use qanom.SemanticRole enum
-            # it is coupled with prepositions in a specific dataset
-            # instead of representing the role as a syntactic position
-            # such as R0, R1, R2 or an adjunct and an optional preposition
-            role = role.name
-        clean_question = question.replace("_", "")
-        toks = [t.strip() for t in clean_question.split() if t.strip()]
-        if toks[-1] == "?":
-            clean_question = " ".join(toks[:-1]) + "?"
-        else:
-            clean_question = " ".join(toks)
-        return clean_question, role
-
     def _postprocess(self, decoded: str, tokens: TokenizedSentence):
         """
         Processes the generated output by a Text-to-Text model
@@ -234,11 +218,15 @@ class T2TQasemArgumentParser:
             qa_splits = raw_qa_pair.split("?", maxsplit=1)
             if len(qa_splits) <= 1:
                 continue
-            question = qa_splits[0].strip() + "?"
-            question, role = self._parse_question(question)
-            # this is the not a good choice since
-            # a ";" sign may be part of an answer..
-            # but that's how the model was trained :-(
+            raw_question = qa_splits[0].strip() + "?"
+            role = get_role(raw_question)
+            if role:
+                # let's not use qanom.SemanticRole enum
+                # it is coupled with prepositions in a specific dataset
+                # instead of representing the role as a syntactic position
+                # such as R0, R1, R2 or an adjunct and an optional preposition
+                role = role.name
+            # question, role = self._parse_question(question)
             answers = qa_splits[1].split(self.answer_separator)
             answers = [ans.strip() for ans in answers]
             for answer in answers:
@@ -247,7 +235,7 @@ class T2TQasemArgumentParser:
                 if answer_start is None:
                     continue
                 arg_text = " ".join(tokens[answer_start: answer_end])
-                arg = QasemArgument(arg_text, question, answer_start, answer_end, role)
+                arg = QasemArgument(arg_text, raw_question, answer_start, answer_end, role)
                 arguments.append(arg)
 
         return arguments
