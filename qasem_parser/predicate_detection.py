@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import Any, List, Union
 
 import spacy
 import torch
@@ -69,6 +69,8 @@ class BertPredicateDetector(PredicateDetector):
         # the output for this batch of sentences
         predicates = [[] for _ in range(len(batch))]
 
+        predicate_sent_token_indices = []
+
         inputs = self._prepare_inputs(batch)
         inputs = inputs.to(self.nom_model.device)
         special_tokens_mask = inputs.pop("special_tokens_mask")
@@ -83,13 +85,20 @@ class BertPredicateDetector(PredicateDetector):
         is_nominal_predicate = is_nominal_predicate.cpu()
         batch_indices, seq_indices = is_nominal_predicate.nonzero(as_tuple=True)
         for batch_idx, seq_idx in zip(batch_indices, seq_indices):
-            doc = batch[batch_idx]
             word_idx = inputs.token_to_word(batch_idx, seq_idx)
+            predicate_sent_token_indices.append((batch_idx.item(), word_idx))
+
+        # drop duplicates, if a predicate word was composed of two subwords
+        # the model will output both subwords, that in turn map to the same 
+        # document token
+        predicate_sent_token_indices = sorted(set(predicate_sent_token_indices))
+        for batch_idx, word_idx in predicate_sent_token_indices:
+            doc = batch[batch_idx]
             pred_token = doc[word_idx]
-            predicate = Predicate(pred_token.lemma_.lower(),
-                                  pred_token.text,
-                                  word_idx,
-                                  pred_token.pos_)
+            lemma = pred_token.lemma_.lower()
+            word = pred_token.text
+            pos = pred_token.pos_
+            predicate = Predicate(lemma, word, word_idx, pos)
             predicates[batch_idx].append(predicate)
         return predicates
 
@@ -137,15 +146,30 @@ class BertPredicateDetector(PredicateDetector):
             return_special_tokens_mask=True,
         )
         return batch
+    
+    @classmethod
+    def _is_list_of_spacy_doc(cls, input: Any):
+        if not isinstance(input, list):
+            return False
+        return isinstance(input[0], Doc)
+    
+    @classmethod
+    def _is_list_of_pretokenized(cls, input: Any):
+        if not isinstance(input, list):
+            return False
+        return isinstance(input[0], list) and input[0] and isinstance(input[0][0], str)
+
 
     def predict(self, sentences: List[Union[Doc, TokenizedSentence]]) -> List[List[Predicate]]:
         # let's syntactically analyze the sentences first:
         if not sentences:
-            return []
-        if isinstance(sentences[0], Doc):
+            return []        
+        if self._is_list_of_spacy_doc(sentences):
             docs = sentences
-        else:
+        elif self._is_list_of_pretokenized(sentences):
             docs = spacy_analyze(sentences, self.nlp)
+        else:
+            raise ValueError(f"Input must either be a list of spacy docs or a list of tokenized sentences, got: {type(sentences)}")
         verb_predicates = self.detect_verbal(docs)
         nom_predicates = self.detect_nominal(docs)
         all_predicates = [verb_preds + noun_preds
