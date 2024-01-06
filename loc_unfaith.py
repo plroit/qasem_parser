@@ -11,8 +11,8 @@ from qasem_parser import QasemParser, QasemFrame, QasemArgument
 import argparse 
 from difflib import SequenceMatcher
 
-IMPORTANT_POS = ['ADJ', 'ADV', 'NOUN', 'NUM', 'PROPN', 'VERB']
-STR_RESEMBLANCE_THR = 0.86
+IMPORTANT_POS = ['ADJ', 'ADV', 'NOUN', 'NUM', 'PROPN', 'VERB', 'PRON']
+STR_RESEMBLANCE_THR = 0.8
 
 def flatten_list(lst):
   return list(chain.from_iterable(lst))

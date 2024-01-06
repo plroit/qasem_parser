@@ -24,7 +24,6 @@
 </div>
 
 
-
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
@@ -32,6 +31,15 @@ Reimplementation of the [QA-SEM pipeline](https://github.com/kleinay/QASem/) wit
 
 <!-- GETTING STARTED -->
 ## Getting Started
+
+### create data for loc-unfaith 
+
+```bash
+python -i run_pipeline_cliff.py \
+--output_dir data/cliff_flan_t5_xl_5_epochs \
+--pretokenized \
+--model_name_or_path /home/nlp/ariecattan/qasem/qa_generation/models/sentence2list/question_answer/flan-t5-xl_joint_tokenized_epoch_5
+```
 
 ### Installation
    ```sh
