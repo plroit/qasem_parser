@@ -90,10 +90,7 @@ class T2TQasemArgumentParser:
     _PREDICATE_START_TOKEN = "<extra_id_0>"
     _PREDICATE_END_TOKEN = "<extra_id_1>"
     _QA_SEPARATOR = "<extra_id_2>"
-    _ANSWER_SEPARATOR = ";"
-
-    # Apply to the newer models once they are uploaded to HF-hub
-    # _ANSWER_SEPARATOR = "<extra_id_3>"
+    _ANSWER_SEPARATOR = "<extra_id_3>"
 
     _PARSE_PREFIX_TOKENS = ["Generate",  "QA",  "pairs:"]
 
@@ -107,7 +104,6 @@ class T2TQasemArgumentParser:
                  predicate_end_token=_PREDICATE_END_TOKEN,
                  qa_separator=_QA_SEPARATOR,
                  answer_separator=_ANSWER_SEPARATOR,
-
     ):
         """
 
