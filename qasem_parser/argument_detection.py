@@ -86,7 +86,6 @@ _DEFAULT_MAX_LENGTH = 256
 
 
 class T2TQasemArgumentParser:
-
     _PREDICATE_START_TOKEN = "<extra_id_0>"
     _PREDICATE_END_TOKEN = "<extra_id_1>"
     _QA_SEPARATOR = "<extra_id_2>"
@@ -126,27 +125,14 @@ class T2TQasemArgumentParser:
         self.qa_separator = qa_separator
         self.answer_separator = answer_separator
 
-
     def __call__(self, *args, **kwargs):
         return self.predict(*args, **kwargs)
 
-    @staticmethod
-    def hack_unknown_tokens(tokens: List[str]):
-        # The default T5 tokenizer cannot handle the ` token that is often found
-        # in quotes in some types of preprocessed text and academic datasets.
-        # Instead it replaces it with an <UNK> token.
-        # Since this case is relatively common, we handle it here.
-        hacked_tokens = [
-            token if token != "``" else '"'
-            for token in tokens
-        ]
-        return hacked_tokens
-
     @classmethod
-    def from_pretrained(cls, path_or_model_name: str, **kwargs):
+    def from_pretrained(cls, path_or_model_name: str, device: str = None, **kwargs):
         tokenizer = AutoTokenizer.from_pretrained(path_or_model_name)
         model = AutoModelForSeq2SeqLM.from_pretrained(path_or_model_name)
-        device = get_device(**kwargs)
+        device = get_device(device=device)
         model = model.to(device)
         return cls(model, tokenizer, **kwargs)
     

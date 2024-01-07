@@ -1,3 +1,4 @@
+import inspect
 
 import spacy
 from spacy.tokens import Doc
@@ -44,16 +45,27 @@ def _group_by_sentences(frames, predicates):
 
 class QasemParser:
 
+    _ARG_PARSER_PARAMETERS = list(inspect.signature(T2TQasemArgumentParser).parameters)
+    _PRED_CLASSIFIER_PARAMETERS = list(inspect.signature(BertPredicateDetector).parameters)
+
     @classmethod
     def from_pretrained(cls,
                         arg_parser_path: str,
                         nom_predicate_detector_path=_DEFAULT_NOMINAL_DETECTOR,
-                        spacy_lang="en_core_web_sm"
+                        spacy_lang="en_core_web_sm", **kwargs
     ):
         # TODO: make this more generic? how to initialize the correct parser class just from the model path?
         nlp = spacy.load(spacy_lang)
-        arg_parser = T2TQasemArgumentParser.from_pretrained(arg_parser_path)
-        predicate_detector = BertPredicateDetector.from_pretrained(nom_predicate_detector_path, nlp)
+        parser_kwargs = {
+            k: kwargs.get(k) for k in dict(kwargs)
+            if k in cls._ARG_PARSER_PARAMETERS
+        }
+        classifier_kwargs = {
+            k: kwargs.get(k) for k in dict(kwargs)
+            if k in cls._PRED_CLASSIFIER_PARAMETERS
+        }
+        arg_parser = T2TQasemArgumentParser.from_pretrained(arg_parser_path, **classifier_kwargs)
+        predicate_detector = BertPredicateDetector.from_pretrained(nom_predicate_detector_path, nlp, **parser_kwargs)
         return cls(arg_parser, predicate_detector, nlp)
 
     def __init__(self, arg_parser: ArgumentParser, predicate_detector: PredicateDetector, spacy_lang: spacy.Language):

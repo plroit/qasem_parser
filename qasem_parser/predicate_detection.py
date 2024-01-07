@@ -23,9 +23,10 @@ class BertPredicateDetector(PredicateDetector):
             cls,
             nominal_classifier_path: str,
             spacy_model_or_name: Union[str, spacy.Language] = 'en_core_web_sm',
+            device: str = None,
             **kwargs
     ):
-        device = torch_utils.get_device(**kwargs)
+        device = torch_utils.get_device(device=device)
         if isinstance(spacy_model_or_name, str):
             nlp = spacy.load(spacy_model_or_name)
         else:

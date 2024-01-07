@@ -41,7 +41,7 @@ class QasemArgument:
     raw_question: str
     start_token: int
     end_token: int
-    role: str | None = None
+    role: Optional[str] = None
 
     @property
     def question(self) -> str:
