@@ -64,8 +64,8 @@ class QasemParser:
             k: kwargs.get(k) for k in dict(kwargs)
             if k in cls._PRED_CLASSIFIER_PARAMETERS
         }
-        arg_parser = T2TQasemArgumentParser.from_pretrained(arg_parser_path, **classifier_kwargs)
-        predicate_detector = BertPredicateDetector.from_pretrained(nom_predicate_detector_path, nlp, **parser_kwargs)
+        arg_parser = T2TQasemArgumentParser.from_pretrained(arg_parser_path, **parser_kwargs)
+        predicate_detector = BertPredicateDetector.from_pretrained(nom_predicate_detector_path, nlp, **classifier_kwargs)
         return cls(arg_parser, predicate_detector, nlp)
 
     def __init__(self, arg_parser: ArgumentParser, predicate_detector: PredicateDetector, spacy_lang: spacy.Language):
