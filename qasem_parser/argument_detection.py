@@ -145,7 +145,7 @@ class T2TQasemArgumentParser:
         # Prefix that starts the prompt (our T5-model was trained with this prefix)
         new_tokens = T2TQasemArgumentParser._PARSE_PREFIX_TOKENS[:]
         # take the sentence till the predicate token
-        new_tokens.extend(tokens[:])
+        new_tokens.extend(tokens[:predicate_index])
         # put the predicate token between two special tokens marking start and end.
         # The model is trained without spaces between the special tokens and the predicate
         pred_start_marker, pred_end_marker = self.predicate_start_end_markers
