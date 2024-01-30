@@ -1,3 +1,4 @@
+from overrides import override
 import torch
 from typing import List, Tuple
 
@@ -177,7 +178,7 @@ class T2TQasemArgumentParser:
         ]
         return post_processed
 
-    def _postprocess(self, decoded: str, tokens: TokenizedSentence):
+    def _postprocess(self, decoded: str, tokens: TokenizedSentence) -> list[QasemArgument]:
         """
         Processes the generated output by a Text-to-Text model
         and parses it into a set of semantic arguments and their questions.
@@ -235,3 +236,64 @@ class T2TQasemArgumentParser:
             QasemFrame(inp_item.sentence, inp_item.predicate, qasem_args)
             for inp_item, qasem_args in zip(items, all_qasem_arg_lists)
         ]
+    
+
+class T2TPropBankArgumentParser(T2TQasemArgumentParser):
+
+    _CORE = [
+        "A0", "A1", "A2", "A3", "A4", "A5", "AA",
+    ]
+
+    _MODIFIERS = [
+        "ADJ", "ADV", "CAU", "COM", "DIR", "DIS", "DSP",
+        "EXT", "GOL", "LVB", "LOC", "MNR", "MOD", "NEG", 
+        "PNC", "PRD", "PRP", "PRR", "PRX", "TMP", "REC"
+    ]
+    _KNOWN_ROLES = [
+        *_CORE,
+        *[f"R-{r}" for r in _CORE],
+        *[f"C-{r}" for r in _CORE],
+        *[f"AM-{r}" for r in _MODIFIERS],
+        *[f"R-AM-{r}" for r in _MODIFIERS],
+        *[f"C-AM-{r}" for r in _MODIFIERS],
+    ]
+
+    def _split_role_and_args(self, raw_role_and_args):
+        raw_role_and_args = raw_role_and_args.strip()
+        role = None
+        raw_args = ""
+        for known_role in self._KNOWN_ROLES:
+            if raw_role_and_args.startswith(known_role):
+                role = known_role
+                raw_args = raw_role_and_args[len(known_role):]
+                break
+        if role is None:
+            raise ValueError(f"Unknown role? {raw_role_and_args}")
+        
+        role_args = [arg.strip() for arg in raw_args.split(self.answer_separator)]
+        return role, role_args
+
+
+    @override
+    def _postprocess(self, decoded: str, tokens: TokenizedSentence) -> list[QasemArgument]:
+        arguments = []
+        # we did not skip special tokens because we rely on <extra_id_2>
+        # now need to remove other special tokens by ourselves
+        decoded2 = decoded.replace(
+            self.tokenizer.pad_token, "").replace(
+            self.tokenizer.eos_token, "").strip(
+        )
+        roles_and_args = decoded2.split(self.qa_separator)
+        for raw_role_and_args in roles_and_args:
+            # now, we forgot that during training..
+            role, raw_args = self._split_role_and_args(raw_role_and_args)
+            for raw_arg in raw_args:
+                # try to locate the answer in the original text
+                answer_start, answer_end = find_answer_idx_with_fallback(tokens, raw_arg)
+                if answer_start is None:
+                    continue
+                arg_text = " ".join(tokens[answer_start: answer_end])
+                arg = QasemArgument(arg_text, "", answer_start, answer_end, role)
+                arguments.append(arg)
+
+        return arguments

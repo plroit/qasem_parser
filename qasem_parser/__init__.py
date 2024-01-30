@@ -1,4 +1,4 @@
-from .argument_detection import T2TQasemArgumentParser
+from .argument_detection import T2TQasemArgumentParser, T2TPropBankArgumentParser
 from .predicate_detection import BertPredicateDetector
 from .qasem_parsing import QasemParser
 from .common_defs import QasemFrame, QasemArgument, ArgInputExample, TokenizedSentence, UntokenizedSentence, Predicate

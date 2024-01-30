@@ -45,11 +45,11 @@ class QasemArgument:
 
     @property
     def question(self) -> str:
+        if not self.raw_question:
+            return ""
         clean_question = _clean_question(self.raw_question)
         return clean_question
     
-
-
     def __repr__(self):
         # The fox (R0: who jumped)
         return f"{self.text} ({self.role or ''}{': ' if self.role else ''}{self.question})"
