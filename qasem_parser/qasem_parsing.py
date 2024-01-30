@@ -4,7 +4,7 @@ import spacy
 from spacy.tokens import Doc
 from typing import List, Union
 
-from . import T2TQasemArgumentParser, BertPredicateDetector
+from . import T2TQasemArgumentParser, BertPredicateDetector, T2TPropBankArgumentParser
 from .common_defs import ArgInputExample, TokenizedSentence, UntokenizedSentence, \
     QasemFrame, PredicateDetector, ArgumentParser, Predicate
 
@@ -45,9 +45,6 @@ def _group_by_sentences(frames, predicates):
 
 class QasemParser:
 
-    _ARG_PARSER_PARAMETERS = list(inspect.signature(T2TQasemArgumentParser).parameters)
-    _PRED_CLASSIFIER_PARAMETERS = list(inspect.signature(BertPredicateDetector).parameters)
-
     @classmethod
     def from_pretrained(cls,
                         arg_parser_path: str,
@@ -56,15 +53,24 @@ class QasemParser:
     ):
         # TODO: make this more generic? how to initialize the correct parser class just from the model path?
         nlp = spacy.load(spacy_lang)
+
+        # There's got to be a better way than this hack :-)
+        if "onto" in arg_parser_path:
+            parser_cls = T2TPropBankArgumentParser
+        else:
+            parser_cls = T2TPropBankArgumentParser
+        parser_params = list(inspect.signature(parser_cls).parameters)
         parser_kwargs = {
             k: kwargs.get(k) for k in dict(kwargs)
-            if k in cls._ARG_PARSER_PARAMETERS
+            if k in parser_params
         }
+        classifier_params = list(inspect.signature(BertPredicateDetector).parameters)
         classifier_kwargs = {
             k: kwargs.get(k) for k in dict(kwargs)
-            if k in cls._PRED_CLASSIFIER_PARAMETERS
+            if k in classifier_params
         }
-        arg_parser = T2TQasemArgumentParser.from_pretrained(arg_parser_path, **parser_kwargs)
+
+        arg_parser = parser_cls.from_pretrained(arg_parser_path, **parser_kwargs)
         predicate_detector = BertPredicateDetector.from_pretrained(nom_predicate_detector_path, nlp, **classifier_kwargs)
         return cls(arg_parser, predicate_detector, nlp)
 
