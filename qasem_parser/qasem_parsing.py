@@ -58,7 +58,7 @@ class QasemParser:
         if "onto" in arg_parser_path:
             parser_cls = T2TPropBankArgumentParser
         else:
-            parser_cls = T2TPropBankArgumentParser
+            parser_cls = T2TQasemArgumentParser
         parser_params = list(inspect.signature(parser_cls).parameters)
         parser_kwargs = {
             k: kwargs.get(k) for k in dict(kwargs)
