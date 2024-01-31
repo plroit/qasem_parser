@@ -267,8 +267,9 @@ class T2TPropBankArgumentParser(T2TQasemArgumentParser):
                 role = known_role
                 raw_args = raw_role_and_args[len(known_role):]
                 break
+        # Encountered an unknown role. Keep argument nevertheless.
         if role is None:
-            raise ValueError(f"Unknown role? {raw_role_and_args}")
+            role = "<UNK>"
         
         role_args = [arg.strip() for arg in raw_args.split(self.answer_separator)]
         return role, role_args
