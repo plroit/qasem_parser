@@ -11,27 +11,62 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, PreTrainedModel, 
 from .torch_utils import get_device
 
 
-def find_answer_idx_with_fallback(tokens: List[str], answer: str):
+def _span_intersection(a: tuple[int, int], b: tuple[int, int]) -> int:
+    max_start = max(a[0], b[0])
+    min_end = min(a[1], b[1])
+    inter_length = max(0, min_end - max_start)
+    return inter_length
+
+
+def _span_distance(span1: Tuple[int, int], span2: Tuple[int, int]):
+    s1, e1 = span1
+    s2, e2 = span2
+    if _span_intersection((s1, e1), (s2, e2)) > 0:
+        return 0
+    # no overlap, if span_1 is first, take s2 - e1
+    if s1 < s2:
+        return s2 - e1
+    else:
+        return s1 - e2
+
+
+def get_closest_span(spans: list[tuple[int, int]], index: int) -> tuple[int, int]:
+    my_span = index, index+1
+    distances = [_span_distance(span, my_span) for span in spans]
+    min_idx = 0
+    for idx, dist in enumerate(distances):
+        if dist < distances[min_idx]:
+            min_idx = idx
+    return spans[min_idx]
+
+
+def find_answer_idx_with_fallback(tokens: List[str], answer: str) -> list[tuple[int, int]]:
     # try to locate the answer in the original text
-    answer_start, answer_end = find_answer_idx(tokens, answer)
-    if answer_start is None:
+    found_spans = find_answer_idx(tokens, answer)
+    if not found_spans:
         # try case insensitive
-        answer_start, answer_end = find_answer_idx(
+        found_spans = find_answer_idx(
             [tok.lower() for tok in tokens], answer.lower()
         )
-    return answer_start, answer_end
+    return found_spans
 
 
-def find_answer_idx(tokens: List[str], answer: str):
-    # TODO: return closest index next to the predicate, not first index in the sentence
+def find_answer_idx(tokens: List[str], answer: str) -> list[tuple[int, int]]:
     # If the text token is in the prefix of the answer
     possible_starts = [idx for idx, tok in enumerate(tokens)
                        if answer[:len(tok)] == tok]
+    locations_found = set()
+    last_end_idx = -1
     for first_token_idx in possible_starts:
+        if first_token_idx < last_end_idx:
+            continue
         end_token_idx = find_answer_from_token(tokens, first_token_idx, answer)
         if end_token_idx is not None:
-            return first_token_idx, end_token_idx,
-    return None, None
+            locations_found.add((first_token_idx, end_token_idx))
+            # start next search after this ending token?
+            last_end_idx = end_token_idx
+
+    return sorted(locations_found)
 
 
 def find_answer_from_token(tokens: List[str], start_token_idx: int, answer: str):
@@ -173,12 +208,12 @@ class T2TQasemArgumentParser:
         outputs = outputs.detach().cpu()
         decoded = self.tokenizer.batch_decode(outputs, skip_special_tokens=False)
         post_processed = [
-            self._postprocess(dec, item.sentence)
+            self._postprocess(dec, item)
             for dec, item in zip(decoded, batch)
         ]
         return post_processed
 
-    def _postprocess(self, decoded: str, tokens: TokenizedSentence) -> list[QasemArgument]:
+    def _postprocess(self, decoded: str, sample: ArgInputExample) -> list[QasemArgument]:
         """
         Processes the generated output by a Text-to-Text model
         and parses it into a set of semantic arguments and their questions.
@@ -196,6 +231,7 @@ class T2TQasemArgumentParser:
             self.tokenizer.pad_token, "").replace(
             self.tokenizer.eos_token, "").strip(
         )
+        tokens = sample.sentence
         qa_pairs = decoded2.split(self.qa_separator)
         for raw_qa_pair in qa_pairs:
             qa_splits = raw_qa_pair.split("?", maxsplit=1)
@@ -214,7 +250,8 @@ class T2TQasemArgumentParser:
             answers = [ans.strip() for ans in answers]
             for answer in answers:
                 # try to locate the answer in the original text
-                answer_start, answer_end = find_answer_idx_with_fallback(tokens, answer)
+                found_locations = find_answer_idx_with_fallback(tokens, answer)
+                answer_start, answer_end = get_closest_span(found_locations, sample.predicate.index)
                 if answer_start is None:
                     continue
                 arg_text = " ".join(tokens[answer_start: answer_end])
@@ -278,9 +315,8 @@ class T2TPropBankArgumentParser(T2TQasemArgumentParser):
         role_args = [arg.strip() for arg in raw_args.split(self.answer_separator)]
         return role, role_args
 
-
     @override
-    def _postprocess(self, decoded: str, tokens: TokenizedSentence) -> list[QasemArgument]:
+    def _postprocess(self, decoded: str, sample: ArgInputExample) -> list[QasemArgument]:
         arguments = []
         # we did not skip special tokens because we rely on <extra_id_2>
         # now need to remove other special tokens by ourselves
@@ -288,13 +324,15 @@ class T2TPropBankArgumentParser(T2TQasemArgumentParser):
             self.tokenizer.pad_token, "").replace(
             self.tokenizer.eos_token, "").strip(
         )
+        tokens = sample.sentence
         roles_and_args = decoded2.split(self.qa_separator)
         for raw_role_and_args in roles_and_args:
             # now, we forgot that during training..
             role, raw_args = self._split_role_and_args(raw_role_and_args)
             for raw_arg in raw_args:
                 # try to locate the answer in the original text
-                answer_start, answer_end = find_answer_idx_with_fallback(tokens, raw_arg)
+                answer_spans = find_answer_idx_with_fallback(tokens, raw_arg)
+                answer_start, answer_end = get_closest_span(answer_spans, sample.predicate.index)
                 if answer_start is None:
                     continue
                 arg_text = " ".join(tokens[answer_start: answer_end])
