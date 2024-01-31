@@ -251,9 +251,9 @@ class T2TQasemArgumentParser:
             for answer in answers:
                 # try to locate the answer in the original text
                 found_locations = find_answer_idx_with_fallback(tokens, answer)
-                answer_start, answer_end = get_closest_span(found_locations, sample.predicate.index)
-                if answer_start is None:
+                if not found_locations:
                     continue
+                answer_start, answer_end = get_closest_span(found_locations, sample.predicate.index)
                 arg_text = " ".join(tokens[answer_start: answer_end])
                 arg = QasemArgument(arg_text, raw_question, answer_start, answer_end, role)
                 arguments.append(arg)
