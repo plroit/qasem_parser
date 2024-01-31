@@ -48,7 +48,7 @@ examples = [
 
 ]
 # 
-pb_path = "/home/nlp/ariecattan/qasem/qa_generation/models/sentence2list/question_answer/flan-t5-large_ontonotes/checkpoint-10000"
+pb_path = "/home/nlp/ariecattan/qasem/qa_generation/models/sentence2list/question_answer/flan-t5-large_ontonotes/checkpoint-8000"
 parser = QasemParser.from_pretrained(pb_path)
 # arg_parser = T2TQasemArgumentParser.from_pretrained(joint_parser_path)
 frames = parser(tokenized_sentences[2], is_pretokenized=True)

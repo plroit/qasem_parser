@@ -265,7 +265,11 @@ class T2TPropBankArgumentParser(T2TQasemArgumentParser):
         for known_role in self._KNOWN_ROLES:
             if raw_role_and_args.startswith(known_role):
                 role = known_role
-                raw_args = raw_role_and_args[len(known_role):]
+                # expected format: A0 : my_argument here
+                raw_args: str = raw_role_and_args[len(known_role):]
+                raw_args = raw_args.strip()
+                if raw_args.startswith(":"):
+                    raw_args = raw_args.replace(":", "", 1).strip()
                 break
         # Encountered an unknown role. Keep argument nevertheless.
         if role is None:
