@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from dataclasses import dataclass
 
+import abc
 from abc import ABC
 
 TokenizedSentence = List[str]
@@ -75,6 +76,7 @@ class PredicateDetector(ABC):
     def __call__(self, *args, **kwargs):
         return self.predict(*args, **kwargs)
 
+    @abc.abstractmethod
     def predict(self, sentences: List[Union[TokenizedSentence, Doc]]) -> List[List[Predicate]]:
         ...
 

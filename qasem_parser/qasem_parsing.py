@@ -21,13 +21,6 @@ _DEFAULT_JOINT_ARG_PARSER = "cattana/flan-t5-large-qasem-joint-tokenized"
 # _DEFAULT_JOINT_ARG_PARSER = "kleinay/qanom-seq2seq-model-joint"
 
 
-def create_arg_input_sample(docs: List[Doc], predicates: List[List[Predicate]]) -> ArgInputExample:
-    return [
-        ArgInputExample([t.text for t in doc], predicate)
-        for doc, doc_preds in zip(docs, predicates)
-        for predicate in doc_preds
-    ]
-
 
 def _group_by_sentences(frames, predicates):
     # let's group back the frames according to sentences,
@@ -160,8 +153,16 @@ class QasemParser:
             return []
         # after normalization, sentences is a batch of spacy Docs.
         docs = self._normalize_input(sentences, is_pretokenized)
-        predicates = self.predicate_detector(docs)
-        arg_input_samples = create_arg_input_sample(docs, predicates)
-        frames = self.arg_parser(arg_input_samples)
-        res = _group_by_sentences(frames, predicates)
+        # predicates: the i-th entry corresponds to the list of predicates
+        # of the i-th sentence.  
+        predicates: list[list[Predicate]] = self.predicate_detector(docs)
+        # flatten the list but be cautious about sentences without predicates
+        all_samples = []
+        for sent, sent_preds in zip(docs, predicates):
+            sent_tokens = [t.text for t in sent]
+            sent_samples = [ArgInputExample(sent_tokens, predicate) for predicate in sent_preds]
+            all_samples.extend(sent_samples)
+        frames = self.arg_parser(all_samples)
+        # group back per sent [[frame, .. frame], ..[frame], ...[],..]
+        res: list[list[QasemFrame]] = _group_by_sentences(frames, predicates)
         return res

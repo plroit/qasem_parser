@@ -1,6 +1,6 @@
-from overrides import override
 import torch
 from typing import List, Tuple
+from overrides import overrides
 
 from qanom.question_info import get_slots, get_role
 
@@ -261,6 +261,8 @@ class T2TQasemArgumentParser:
         return arguments
 
     def predict(self, items: List[ArgInputExample]) -> List[QasemFrame]:
+        if not items:
+            return []
         if not isinstance(items[0].sentence, List):
             raise ValueError("Sentences must be tokenized (list of tokens per sentence) when used with the ArgumentParser")
 
@@ -315,7 +317,7 @@ class T2TPropBankArgumentParser(T2TQasemArgumentParser):
         role_args = [arg.strip() for arg in raw_args.split(self.answer_separator)]
         return role, role_args
 
-    @override
+    @overrides
     def _postprocess(self, decoded: str, sample: ArgInputExample) -> list[QasemArgument]:
         arguments = []
         # we did not skip special tokens because we rely on <extra_id_2>
